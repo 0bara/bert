@@ -22,7 +22,7 @@ import collections
 import re
 import unicodedata
 import six
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 
 def validate_case_matches_checkpoint(do_lower_case, init_checkpoint):
@@ -161,10 +161,11 @@ def whitespace_tokenize(text):
 class FullTokenizer(object):
   """Runs end-to-end tokenziation."""
 
-  def __init__(self, vocab_file, do_lower_case=True):
+  def __init__(self, vocab_file, tokenizer=None, do_lower_case=True):
     self.vocab = load_vocab(vocab_file)
     self.inv_vocab = {v: k for k, v in self.vocab.items()}
-    self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
+    #self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
+    self.basic_tokenizer = JumanPPTokenizer()
     self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab)
 
   def tokenize(self, text):
@@ -397,3 +398,29 @@ def _is_punctuation(char):
   if cat.startswith("P"):
     return True
   return False
+
+class JumanPPTokenizer(BasicTokenizer):
+  def __init__(self):
+    """
+        日本語専用トークナイザの構築。
+        JUMAN++ を使用する。
+   """
+    from pyknp import Juman
+
+    self.do_lower_case = False
+    self._jumanpp = Juman()
+
+  def tokenize(self, text):
+    """Tokenizes a piece of text."""""
+    text = convert_to_unicode(text.replace(' ', ''))
+    text = self._clean_text(text)
+
+    juman_result = self._jumanpp.analysis(text)
+    split_tokens = []
+    for mrph in juman_result.mrph_list():
+      split_tokens.extend(self._run_split_on_punc(mrph.midasi))
+
+    output_tokens = whitespace_tokenize(" ".join(split_tokens))
+    print(split_tokens)
+    return output_tokens
+
